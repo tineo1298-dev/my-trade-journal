@@ -181,7 +181,29 @@ st.title("☁️ Trading Journal")
 
 # --- 1. SIDEBAR (PLAN) ---
 with st.sidebar:
+    # [Start] ส่วนเลือก Theme (เพิ่มใหม่ตรงนี้)
+    st.header("🎨 Theme")
+    theme_mode = st.radio("เลือกสีพื้นหลัง", ["Dark (ดำ)", "Light (ขาว)"], horizontal=True)
+    
+    if theme_mode == "Light (ขาว)":
+        st.markdown("""
+            <style>
+                /* บังคับพื้นหลังขาว */
+                .stApp { background-color: #ffffff; color: #000000; }
+                [data-testid="stSidebar"] { background-color: #f0f2f6; }
+                [data-testid="stHeader"] { background-color: rgba(0,0,0,0); }
+                /* ปรับสีตัวอักษรใน Input ให้เข้มขึ้น */
+                .stTextInput, .stNumberInput, .stSelectbox, .stDateInput, .stTextArea {
+                    color: #31333F !important;
+                }
+                div[data-baseweb="select"] > div { color: #31333F !important; }
+            </style>
+        """, unsafe_allow_html=True)
+    # [End] จบส่วนเลือก Theme
+
+    st.markdown("---")
     st.header("📝 สร้างแผน (Plan)")
+  
     c1, c2, c3 = st.columns([1.2, 1, 1])
     with c1: date = st.date_input("วันที่", datetime.now())
     with c2: coin_name = st.text_input("Coin", "BTC").upper()
@@ -363,5 +385,6 @@ if not df.empty:
 else:
 
     st.info("👋 ยินดีต้อนรับ! เริ่มบันทึกเทรดแรกของคุณได้เลย")
+
 
 
