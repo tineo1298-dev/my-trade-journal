@@ -35,7 +35,7 @@ supabase = init_supabase()
 # ==========================================
 # 🍪 COOKIE MANAGER (ตัวช่วยจำล็อกอิน)
 # ==========================================
-@st.cache_resource(experimental_allow_widgets=True)
+@st.cache_resource
 def get_manager():
     return stx.CookieManager()
 
@@ -411,3 +411,4 @@ if not df.empty:
 
 else:
     st.info("👋 ยินดีต้อนรับ! เริ่มบันทึกเทรดแรกของคุณได้เลย")
+
