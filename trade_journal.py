@@ -106,7 +106,7 @@ def show_tradingview_chart(coin_name):
       <script type="text/javascript">
       new TradingView.widget(
       {{
-      "width": "100%", "height": 450,
+      "width": "100%", "height": 800,
       "symbol": "BINANCE:{coin_name}USDT",
       "interval": "60", "timezone": "Asia/Bangkok",
       "theme": "dark", "style": "1", "locale": "en",
@@ -170,7 +170,7 @@ if st.sidebar.button("Logout"):
     st.session_state.user = None
     st.rerun()
 
-st.title("☁️ Trading Journal: Cloud Edition")
+st.title("☁️ Trading Journal")
 
 # --- 1. SIDEBAR (PLAN) ---
 with st.sidebar:
@@ -178,7 +178,7 @@ with st.sidebar:
     c1, c2, c3 = st.columns([1.2, 1, 1])
     with c1: date = st.date_input("วันที่", datetime.now())
     with c2: coin_name = st.text_input("Coin", "BTC").upper()
-    with c3: position = st.selectbox("Pos", ["Long", "Short"])
+    with c3: position = st.selectbox("Po", ["L", "S"])
     
     c4, c5 = st.columns(2)
     with c4: leverage = st.number_input("Lev (x)", 1, 125, 20)
@@ -354,4 +354,5 @@ if not df.empty:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
 
 else:
+
     st.info("👋 ยินดีต้อนรับ! เริ่มบันทึกเทรดแรกของคุณได้เลย")
