@@ -1,23 +1,25 @@
 import streamlit as st
 import pandas as pd
 import io
+import time
 from datetime import datetime, timedelta
 from PIL import Image
 import altair as alt
 from supabase import create_client
-import streamlit.components.v1 as components # ใช้สำหรับกราฟ TradingView
+import streamlit.components.v1 as components 
+import extra_streamlit_components as stx # ตัวช่วยจัดการ Cookie
 
 # --- ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="Master Trading Journal", layout="wide")
 
 # =========================================================
-# 🔐 SECRETS CONFIG (ดึง Key จาก Cloud/Local)
+# 🔐 SECRETS CONFIG
 # =========================================================
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 except:
-    st.error("ไม่พบ Key! กรุณาตั้งค่า Secrets ใน .streamlit/secrets.toml หรือบน Streamlit Cloud")
+    st.error("ไม่พบ Key! กรุณาตั้งค่า Secrets")
     st.stop()
 
 # Initialize Supabase
@@ -31,7 +33,22 @@ def init_supabase():
 supabase = init_supabase()
 
 # ==========================================
-# 🔐 AUTHENTICATION & LOGIN SYSTEM
+# 🍪 COOKIE MANAGER (ตัวช่วยจำล็อกอิน)
+# ==========================================
+@st.cache_resource(experimental_allow_widgets=True)
+def get_manager():
+    return stx.CookieManager()
+
+cookie_manager = get_manager()
+
+# ==========================================
+# 🕒 THAI TIME HELPER
+# ==========================================
+def get_thai_now():
+    return datetime.utcnow() + timedelta(hours=7)
+
+# ==========================================
+# 🔐 AUTHENTICATION
 # ==========================================
 if 'user' not in st.session_state:
     st.session_state.user = None
@@ -39,19 +56,39 @@ if 'user' not in st.session_state:
 def login_page():
     st.title("🔐 เข้าสู่ระบบ (Trading Journal)")
     
-    tab1, tab2 = st.tabs(["Login", "Sign Up (สมัครสมาชิก)"])
+    # พยายามกู้คืน Session จาก Cookie
+    if not st.session_state.user:
+        try:
+            # ดึง Token จาก Cookie
+            token = cookie_manager.get(cookie="supabase_access_token")
+            if token:
+                # ถ้ามี Token ให้ลองถาม Supabase ว่าใคร?
+                user_response = supabase.auth.get_user(token)
+                if user_response and user_response.user:
+                    st.session_state.user = user_response.user
+                    st.rerun() # รีเฟรชหน้าเพื่อเข้าใช้งานทันที
+        except:
+            pass # ถ้ากู้ไม่ได้ ก็ปล่อยผ่านไปหน้า Login ปกติ
+
+    tab1, tab2 = st.tabs(["Login", "Sign Up"])
     
     with tab1:
         email = st.text_input("Email", key="login_email")
         password = st.text_input("Password", type="password", key="login_pass")
         if st.button("Log In", type="primary"):
             try:
+                # ล็อกอินปกติ
                 response = supabase.auth.sign_in_with_password({"email": email, "password": password})
                 st.session_state.user = response.user
+                
+                # [สำคัญ] บันทึก Token ลง Cookie (อายุ 7 วัน)
+                if response.session:
+                    cookie_manager.set("supabase_access_token", response.session.access_token, expires_at=datetime.now() + timedelta(days=7))
+                
                 st.success("Login สำเร็จ!")
+                time.sleep(1) # รอเขียน Cookie แป๊บนึง
                 st.rerun()
-            except Exception as e:
-                st.error(f"Login ไม่ผ่าน: {e}")
+            except Exception as e: st.error(f"Login ไม่ผ่าน: {e}")
 
     with tab2:
         new_email = st.text_input("Email", key="signup_email")
@@ -60,17 +97,16 @@ def login_page():
         if st.button("สมัครสมาชิก (Sign Up)"):
             try:
                 response = supabase.auth.sign_up({"email": new_email, "password": new_password})
-                if response.user:
-                    st.success("สมัครสมาชิกสำเร็จ! กรุณา Log In ที่แถบแรก")
-            except Exception as e:
-                st.error(f"สมัครไม่ผ่าน: {e}")
+                if response.user: st.success("สมัครสมาชิกสำเร็จ! กรุณา Log In")
+            except Exception as e: st.error(f"สมัครไม่ผ่าน: {e}")
 
+# ถ้ายังไม่มี User ให้แสดงหน้า Login และหยุดทำงานส่วนอื่น
 if not st.session_state.user:
     login_page()
     st.stop()
 
 # ==========================================
-# ☁️ CLOUD STORAGE FUNCTIONS
+# ☁️ CLOUD STORAGE
 # ==========================================
 def upload_image_to_supabase(uploaded_file, prefix, coin_name):
     if uploaded_file is None: return "None"
@@ -83,7 +119,7 @@ def upload_image_to_supabase(uploaded_file, prefix, coin_name):
         img_byte_arr = img_byte_arr.getvalue()
 
         user_id = st.session_state.user.id
-        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp_str = get_thai_now().strftime("%Y%m%d_%H%M%S")
         file_path = f"{user_id}/{prefix}_{coin_name}_{timestamp_str}.jpg"
 
         supabase.storage.from_("trade_images").upload(
@@ -95,12 +131,10 @@ def upload_image_to_supabase(uploaded_file, prefix, coin_name):
         return "None"
 
 # ==========================================
-# 📈 TRADINGVIEW CHART FUNCTION (แก้ไข)
+# 📈 TRADINGVIEW CHART (สูง 800)
 # ==========================================
 def show_tradingview_chart(coin_name):
     if not coin_name: coin_name = "BTC"
-    
-    # [สำคัญ] ต้องประกาศตัวแปรนี้ก่อน! ไม่งั้นจะ Error
     chart_height = 800
     
     html_code = f"""
@@ -110,8 +144,7 @@ def show_tradingview_chart(coin_name):
       <script type="text/javascript">
       new TradingView.widget(
       {{
-      "width": "100%", 
-      "height": {chart_height}, 
+      "width": "100%", "height": {chart_height}, 
       "symbol": "BINANCE:{coin_name}USDT",
       "interval": "60", "timezone": "Asia/Bangkok",
       "theme": "dark", "style": "1", "locale": "en",
@@ -122,26 +155,28 @@ def show_tradingview_chart(coin_name):
       </script>
     </div>
     """
-    
-    # ตอนนี้โปรแกรมจะรู้จัก chart_height แล้วครับ
     components.html(html_code, height=chart_height + 50)
 
 # ==========================================
-# 📊 DATA LOADING & CALCULATIONS
+# 📊 DATA LOADING
 # ==========================================
 def load_data():
     if not supabase: return pd.DataFrame()
     try:
         user_id = st.session_state.user.id
         response = supabase.table("trade_journal").select("*").eq("user_id", user_id).order("id", desc=True).execute()
-        
         data = response.data
         if data:
             df = pd.DataFrame(data)
             if 'date' in df.columns: df['date'] = pd.to_datetime(df['date'])
+            
             if 'created_at' in df.columns: 
                 df['created_at'] = pd.to_datetime(df['created_at'])
-            
+                try:
+                    df['created_at'] = df['created_at'].dt.tz_convert('Asia/Bangkok')
+                except:
+                    df['created_at'] = df['created_at'].dt.tz_localize('UTC').dt.tz_convert('Asia/Bangkok')
+
             df['real_pnl'] = df['real_pnl'].fillna(0.0)
             df['margin'] = df['margin'].fillna(0.0)
             df['leverage'] = df['leverage'].fillna(1)
@@ -159,7 +194,7 @@ def calculate_streak(df):
         if (dates[i] - dates[i-1]).days == 1: temp += 1
         else: max_streak = max(max_streak, temp); temp = 1
     max_streak = max(max_streak, temp)
-    today = datetime.now().date()
+    today = get_thai_now().date()
     yesterday = today - timedelta(days=1)
     if dates[-1] in [today, yesterday]:
         current_streak = 1
@@ -173,50 +208,37 @@ def calculate_streak(df):
 # ==========================================
 st.sidebar.caption(f"👤 User: {st.session_state.user.email}")
 if st.sidebar.button("Logout"):
+    # ลบคุกกี้ออกเมื่อ Logout
+    cookie_manager.delete("supabase_access_token")
     supabase.auth.sign_out()
     st.session_state.user = None
     st.rerun()
 
-st.title("☁️ Trading Journal")
+st.title("☁️ Trading Journal: Cloud Edition")
 
 # --- 1. SIDEBAR (PLAN) ---
 with st.sidebar:
-    # [Start] บังคับ Dark Mode ถาวร 
+    # [Start] บังคับ Dark Mode ถาวร
     st.markdown("""
         <style>
-            /* 1. บังคับพื้นหลังหลักสีดำ */
             [data-testid="stAppViewContainer"] { background-color: #0e1117 !important; color: #fafafa !important; }
-            
-            /* 2. บังคับ Sidebar สีเทาเข้ม */
             [data-testid="stSidebar"] { background-color: #262730 !important; }
             [data-testid="stSidebar"] * { color: #fafafa !important; }
-            
-            /* 3. Header ใส */
             [data-testid="stHeader"] { background-color: rgba(0,0,0,0); }
-            
-            /* 4. ตัวหนังสือทั้งหมดสีขาว */
             h1, h2, h3, h4, h5, h6, p, li, span, label { color: #fafafa !important; }
-            
-            /* 5. ช่องกรอกข้อมูล (Input) */
             input, textarea, [data-baseweb="select"] div {
-                color: #fafafa !important; 
-                -webkit-text-fill-color: #fafafa !important; 
-                caret-color: #fafafa !important;
+                color: #fafafa !important; -webkit-text-fill-color: #fafafa !important; caret-color: #fafafa !important;
             }
-            .stTextInput > div > div, .stNumberInput > div > div, .stTextArea > div > div { 
-                background-color: #262730 !important; 
-            }
+            .stTextInput > div > div, .stNumberInput > div > div, .stTextArea > div > div { background-color: #262730 !important; }
         </style>
     """, unsafe_allow_html=True)
-    # [End] จบโค้ดบังคับ Dark Mode
-
-    # เริ่มส่วนสร้างแผนเลย
+    
     st.header("📝 สร้างแผน (Plan)")
 
     c1, c2, c3 = st.columns([1.2, 1, 1])
-    with c1: date = st.date_input("วันที่", datetime.now())
+    with c1: date = st.date_input("วันที่", get_thai_now())
     with c2: coin_name = st.text_input("Coin", "BTC").upper()
-    with c3: position = st.selectbox("Po", ["L", "S"])
+    with c3: position = st.selectbox("Pos", ["Long", "Short"])
     
     c4, c5 = st.columns(2)
     with c4: leverage = st.number_input("Lev (x)", 1, 125, 20)
@@ -261,7 +283,6 @@ with st.sidebar:
             except Exception as e: st.error(f"Error: {e}")
 
 # --- SHOW TRADINGVIEW CHART ---
-# แสดงกราฟทันทีหลัง Title ตามชื่อเหรียญที่กรอกใน Sidebar
 if coin_name:
     st.markdown(f"### 📈 {coin_name}/USDT")
     show_tradingview_chart(coin_name)
@@ -283,16 +304,15 @@ if not df.empty:
 
     st.markdown("---")
 
-    # กราฟสถิติ (Heatmap & Activity)
     c_hm1, c_hm2 = st.columns([2, 1])
     with c_hm1:
         if 'created_at' in df.columns:
             hm = alt.Chart(df).mark_rect().encode(
-                x=alt.X('hours(created_at):O', title='Hour'),
+                x=alt.X('hours(created_at):O', title='Hour (Thai Time)'),
                 y=alt.Y('day(created_at):O', title='Day', sort=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']),
                 color=alt.Color('count():Q', scale=alt.Scale(scheme='blues')),
                 tooltip=['day(created_at)', 'hours(created_at)', 'count()']
-            ).properties(height=200, title="Time Heatmap")
+            ).properties(height=200, title="Time Heatmap (UTC+7)")
             st.altair_chart(hm, use_container_width=True)
     with c_hm2:
         dc = df['date'].dt.date.value_counts().reset_index()
@@ -305,7 +325,6 @@ if not df.empty:
         ).properties(height=200, title="Daily Activity")
         st.altair_chart(gh, use_container_width=True)
 
-    # กราฟ Equity Curve
     if not closed.empty:
         st.markdown("#### 💹 Equity Curve")
         cd = closed.sort_values(by="date")
@@ -379,7 +398,6 @@ if not df.empty:
                 st.image(row['result_image_path'], caption="ผลลัพธ์", use_container_width=True)
             else: st.caption("ไม่มีรูป")
             
-        # ปุ่มลบข้อมูล
         st.markdown("---")
         with st.expander(f"🗑️ ลบรายการ ID {vid}"):
             st.warning("คำเตือน: ลบแล้วกู้คืนไม่ได้")
@@ -392,14 +410,4 @@ if not df.empty:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
 
 else:
-
     st.info("👋 ยินดีต้อนรับ! เริ่มบันทึกเทรดแรกของคุณได้เลย")
-
-
-
-
-
-
-
-
-
