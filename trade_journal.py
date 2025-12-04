@@ -51,51 +51,62 @@ if 'user' not in st.session_state:
     st.session_state.user = None
 
 def login_page():
-    st.title("🔐 เข้าสู่ระบบ (Trading Journal)")
-    
-    # พยายามกู้คืน Session จาก Cookie
+    # 1. เช็ค Cookie (Logic เดิม)
     if not st.session_state.user:
         try:
-            # ดึง Token จาก Cookie
             token = cookie_manager.get(cookie="supabase_access_token")
             if token:
-                # ถ้ามี Token ให้ลองถาม Supabase ว่าใคร?
                 user_response = supabase.auth.get_user(token)
                 if user_response and user_response.user:
                     st.session_state.user = user_response.user
-                    st.rerun() # รีเฟรชหน้าเพื่อเข้าใช้งานทันที
+                    st.rerun()
         except:
-            pass # ถ้ากู้ไม่ได้ ก็ปล่อยผ่านไปหน้า Login ปกติ
+            pass
 
-    tab1, tab2 = st.tabs(["Login", "Sign Up"])
-    
-    with tab1:
-        email = st.text_input("Email", key="login_email")
-        password = st.text_input("Password", type="password", key="login_pass")
-        if st.button("Log In", type="primary"):
-            try:
-                # ล็อกอินปกติ
-                response = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                st.session_state.user = response.user
-                
-                # [สำคัญ] บันทึก Token ลง Cookie (อายุ 7 วัน)
-                if response.session:
-                    cookie_manager.set("supabase_access_token", response.session.access_token, expires_at=datetime.now() + timedelta(days=7))
-                
-                st.success("Login สำเร็จ!")
-                time.sleep(1) # รอเขียน Cookie แป๊บนึง
-                st.rerun()
-            except Exception as e: st.error(f"Login ไม่ผ่าน: {e}")
+    # 2. จัดหน้าจอ: แบ่งเป็น 3 ส่วน [ว่าง 1 ส่วน] [กล่องเนื้อหา 1.5 ส่วน] [ว่าง 1 ส่วน]
+    col1, col2, col3 = st.columns([1, 1.5, 1])
 
-    with tab2:
-        new_email = st.text_input("Email", key="signup_email")
-        new_password = st.text_input("Password", type="password", key="signup_pass")
-        st.caption("รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร")
-        if st.button("สมัครสมาชิก (Sign Up)"):
-            try:
-                response = supabase.auth.sign_up({"email": new_email, "password": new_password})
-                if response.user: st.success("สมัครสมาชิกสำเร็จ! กรุณา Log In")
-            except Exception as e: st.error(f"สมัครไม่ผ่าน: {e}")
+    # 3. ใส่เนื้อหาเฉพาะใน "col2" (ช่องกลาง)
+    with col2:
+        st.markdown("<h1 style='text-align: center;'>🔐 Trading Journal</h1>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True) # เว้นบรรทัดนิดนึง
+
+        # สร้างกล่องที่มีเส้นขอบ (Border Box)
+        with st.container(border=True):
+            tab1, tab2 = st.tabs(["เข้าสู่ระบบ (Login)", "สมัครใหม่ (Sign Up)"])
+            
+            with tab1:
+                st.write(" ") # เว้นวรรค
+                email = st.text_input("Email", key="login_email")
+                password = st.text_input("Password", type="password", key="login_pass")
+                st.write(" ")
+                
+                # ปุ่ม Login เต็มความกว้าง
+                if st.button("Log In", type="primary", use_container_width=True):
+                    try:
+                        response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                        st.session_state.user = response.user
+                        
+                        if response.session:
+                            cookie_manager.set("supabase_access_token", response.session.access_token, expires_at=datetime.now() + timedelta(days=7))
+                        
+                        st.success("Login สำเร็จ!")
+                        time.sleep(1)
+                        st.rerun()
+                    except Exception as e: st.error(f"Login ไม่ผ่าน: {e}")
+
+            with tab2:
+                st.write(" ")
+                new_email = st.text_input("Email", key="signup_email")
+                new_password = st.text_input("Password", type="password", key="signup_pass")
+                st.caption("รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร")
+                st.write(" ")
+                
+                if st.button("สมัครสมาชิก", use_container_width=True):
+                    try:
+                        response = supabase.auth.sign_up({"email": new_email, "password": new_password})
+                        if response.user: st.success("สมัครสำเร็จ! กรุณา Log In")
+                    except Exception as e: st.error(f"สมัครไม่ผ่าน: {e}")
 
 # ถ้ายังไม่มี User ให้แสดงหน้า Login และหยุดทำงานส่วนอื่น
 if not st.session_state.user:
@@ -408,6 +419,7 @@ if not df.empty:
 
 else:
     st.info("👋 ยินดีต้อนรับ! เริ่มบันทึกเทรดแรกของคุณได้เลย")
+
 
 
 
