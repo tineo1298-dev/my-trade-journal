@@ -181,25 +181,38 @@ st.title("☁️ Trading Journal")
 
 # --- 1. SIDEBAR (PLAN) ---
 with st.sidebar:
-    # [Start] ส่วนเลือก Theme
-    theme_mode = st.radio("Theme", ["Dark", "Light"], horizontal=True, label_visibility="collapsed")
-    
-    if theme_mode == "Light (ขาว)":
-        st.markdown("""
-            <style>
-                .stApp { background-color: #ffffff; color: #000000; }
-                [data-testid="stSidebar"] { background-color: #f0f2f6; }
-                [data-testid="stHeader"] { background-color: rgba(0,0,0,0); }
-                .stTextInput, .stNumberInput, .stSelectbox, .stDateInput, .stTextArea {
-                    color: #31333F !important;
-                }
-                div[data-baseweb="select"] > div { color: #31333F !important; }
-            </style>
-        """, unsafe_allow_html=True)
-    
-    # สังเกตว่าบรรทัดนี้ ต้องย่อหน้าเท่ากับคำว่า if ข้างบน (ห้ามย่อลึกเข้าไป)
+    # [Start] บังคับ Dark Mode ถาวร 
+    st.markdown("""
+        <style>
+            /* 1. บังคับพื้นหลังหลักสีดำ */
+            [data-testid="stAppViewContainer"] { background-color: #0e1117 !important; color: #fafafa !important; }
+            
+            /* 2. บังคับ Sidebar สีเทาเข้ม */
+            [data-testid="stSidebar"] { background-color: #262730 !important; }
+            [data-testid="stSidebar"] * { color: #fafafa !important; }
+            
+            /* 3. Header ใส */
+            [data-testid="stHeader"] { background-color: rgba(0,0,0,0); }
+            
+            /* 4. ตัวหนังสือทั้งหมดสีขาว */
+            h1, h2, h3, h4, h5, h6, p, li, span, label { color: #fafafa !important; }
+            
+            /* 5. ช่องกรอกข้อมูล (Input) */
+            input, textarea, [data-baseweb="select"] div {
+                color: #fafafa !important; 
+                -webkit-text-fill-color: #fafafa !important; 
+                caret-color: #fafafa !important;
+            }
+            .stTextInput > div > div, .stNumberInput > div > div, .stTextArea > div > div { 
+                background-color: #262730 !important; 
+            }
+        </style>
+    """, unsafe_allow_html=True)
+    # [End] จบโค้ดบังคับ Dark Mode
+
+    # เริ่มส่วนสร้างแผนเลย
     st.header("📝 สร้างแผน (Plan)")
-    
+
     c1, c2, c3 = st.columns([1.2, 1, 1])
     with c1: date = st.date_input("วันที่", datetime.now())
     with c2: coin_name = st.text_input("Coin", "BTC").upper()
@@ -381,6 +394,7 @@ if not df.empty:
 else:
 
     st.info("👋 ยินดีต้อนรับ! เริ่มบันทึกเทรดแรกของคุณได้เลย")
+
 
 
 
