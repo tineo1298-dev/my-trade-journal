@@ -7,19 +7,19 @@ from PIL import Image
 import altair as alt
 from supabase import create_client
 import streamlit.components.v1 as components 
-import extra_streamlit_components as stx # ตัวช่วยจัดการ Cookie
+import extra_streamlit_components as stx 
 
 # --- ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="Master Trading Journal", layout="wide")
 
 # =========================================================
-# 🔐 SECRETS CONFIG
+# 🔐 SECRETS CONFIG (ดึง Key จาก secrets.toml หรือ Cloud)
 # =========================================================
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 except:
-    st.error("ไม่พบ Key! กรุณาตั้งค่า Secrets")
+    st.error("ไม่พบ Key! กรุณาสร้างไฟล์ .streamlit/secrets.toml ในเครื่อง หรือตั้งค่า Secrets บน Cloud")
     st.stop()
 
 # Initialize Supabase
@@ -35,13 +35,13 @@ supabase = init_supabase()
 # ==========================================
 # 🍪 COOKIE MANAGER (ตัวช่วยจำล็อกอิน)
 # ==========================================
-# แก้ไขล่าสุด: เรียกใช้ stx.CookieManager() ตรงๆ เลย (ห้ามมีคำว่า get_manager)
-cookie_manager = stx.CookieManager()
+cookie_manager = stx.CookieManager(key="auth_cookie")
 
 # ==========================================
 # 🕒 THAI TIME HELPER
 # ==========================================
 def get_thai_now():
+    # เวลาปัจจุบัน (UTC) + 7 ชั่วโมง
     return datetime.utcnow() + timedelta(hours=7)
 
 # ==========================================
@@ -51,7 +51,7 @@ if 'user' not in st.session_state:
     st.session_state.user = None
 
 def login_page():
-    # 1. เช็ค Cookie (Logic เดิม)
+    # 1. เช็ค Cookie เพื่อ Auto Login
     if not st.session_state.user:
         try:
             token = cookie_manager.get(cookie="supabase_access_token")
@@ -66,27 +66,26 @@ def login_page():
     # 2. จัดหน้าจอ: แบ่งเป็น 3 ส่วน [ว่าง 1 ส่วน] [กล่องเนื้อหา 1.5 ส่วน] [ว่าง 1 ส่วน]
     col1, col2, col3 = st.columns([1, 1.5, 1])
 
-    # 3. ใส่เนื้อหาเฉพาะใน "col2" (ช่องกลาง)
     with col2:
         st.markdown("<h1 style='text-align: center;'>🔐 Trading Journal</h1>", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True) # เว้นบรรทัดนิดนึง
+        st.markdown("<br>", unsafe_allow_html=True)
 
-        # สร้างกล่องที่มีเส้นขอบ (Border Box)
+        # สร้างกล่องที่มีเส้นขอบ (Card UI)
         with st.container(border=True):
             tab1, tab2 = st.tabs(["เข้าสู่ระบบ (Login)", "สมัครใหม่ (Sign Up)"])
             
             with tab1:
-                st.write(" ") # เว้นวรรค
+                st.write(" ")
                 email = st.text_input("Email", key="login_email")
                 password = st.text_input("Password", type="password", key="login_pass")
                 st.write(" ")
                 
-                # ปุ่ม Login เต็มความกว้าง
                 if st.button("Log In", type="primary", use_container_width=True):
                     try:
                         response = supabase.auth.sign_in_with_password({"email": email, "password": password})
                         st.session_state.user = response.user
                         
+                        # บันทึก Token ลง Cookie (7 วัน)
                         if response.session:
                             cookie_manager.set("supabase_access_token", response.session.access_token, expires_at=datetime.now() + timedelta(days=7))
                         
@@ -127,6 +126,7 @@ def upload_image_to_supabase(uploaded_file, prefix, coin_name):
         img_byte_arr = img_byte_arr.getvalue()
 
         user_id = st.session_state.user.id
+        # ใช้เวลาไทยตั้งชื่อไฟล์
         timestamp_str = get_thai_now().strftime("%Y%m%d_%H%M%S")
         file_path = f"{user_id}/{prefix}_{coin_name}_{timestamp_str}.jpg"
 
@@ -139,11 +139,11 @@ def upload_image_to_supabase(uploaded_file, prefix, coin_name):
         return "None"
 
 # ==========================================
-# 📈 TRADINGVIEW CHART (สูง 800)
+# 📈 TRADINGVIEW CHART 
 # ==========================================
 def show_tradingview_chart(coin_name):
     if not coin_name: coin_name = "BTC"
-    chart_height = 800
+    chart_height = 750
     
     html_code = f"""
     <div class="tradingview-widget-container">
@@ -178,6 +178,7 @@ def load_data():
             df = pd.DataFrame(data)
             if 'date' in df.columns: df['date'] = pd.to_datetime(df['date'])
             
+            # แปลงเวลาเป็นไทย
             if 'created_at' in df.columns: 
                 df['created_at'] = pd.to_datetime(df['created_at'])
                 try:
@@ -216,23 +217,33 @@ def calculate_streak(df):
 # ==========================================
 st.sidebar.caption(f"👤 User: {st.session_state.user.email}")
 if st.sidebar.button("Logout"):
-    # ลบคุกกี้ออกเมื่อ Logout
     cookie_manager.delete("supabase_access_token")
     supabase.auth.sign_out()
     st.session_state.user = None
     st.rerun()
 
-st.title("☁️ Trading Journal: Cloud Edition")
+st.title("☁️ Trade with discipline")
 
 # --- 1. SIDEBAR (PLAN) ---
 with st.sidebar:
-    # [Start] บังคับ Dark Mode ถาวร
+    # [Start] CSS บังคับ Dark Mode + ลดช่องว่างด้านบน
     st.markdown("""
         <style>
+            /* 1. ขยับหน้าจอทั้งหมดขึ้นไปชิดขอบบน */
+            .block-container {
+                padding-top: 0.5rem !important;
+                padding-bottom: 1rem !important;
+            }
+            /* ดึงหัวข้อใหญ่ขึ้นไปอีก */
+            h1 { margin-top: -1rem !important; padding-top: 0rem !important; }
+            
+            /* 2. บังคับ Dark Mode ถาวร */
             [data-testid="stAppViewContainer"] { background-color: #0e1117 !important; color: #fafafa !important; }
             [data-testid="stSidebar"] { background-color: #262730 !important; }
             [data-testid="stSidebar"] * { color: #fafafa !important; }
             [data-testid="stHeader"] { background-color: rgba(0,0,0,0); }
+            
+            /* 3. ปรับสีตัวอักษรและ Input */
             h1, h2, h3, h4, h5, h6, p, li, span, label { color: #fafafa !important; }
             input, textarea, [data-baseweb="select"] div {
                 color: #fafafa !important; -webkit-text-fill-color: #fafafa !important; caret-color: #fafafa !important;
@@ -276,9 +287,14 @@ with st.sidebar:
             with st.spinner("กำลังอัปโหลดรูป..."):
                 path_url = upload_image_to_supabase(uploaded_plan_img, "PLAN", coin_name)
             
+            # [แก้ตรงนี้] รวม "วันที่ที่เลือก" + "เวลาปัจจุบัน" เข้าด้วยกัน
+            current_time = get_thai_now().time()
+            full_datetime = datetime.combine(date, current_time)
+
             new_data = {
                 "user_id": st.session_state.user.id,
-                "date": str(date), "coin": coin_name, "position": position,
+                "date": str(full_datetime), # ส่งไปทั้งวันที่และเวลา
+                "coin": coin_name, "position": position,
                 "leverage": leverage, "margin": margin, "position_size": total_pos,
                 "entry_price": entry_price, "plan_tp": tp_price, "plan_sl": sl_price,
                 "plan_note": plan_note, "real_pnl": 0.0, "exit_note": "-",
@@ -288,6 +304,7 @@ with st.sidebar:
             try:
                 supabase.table("trade_journal").insert(new_data).execute()
                 st.success("บันทึกสำเร็จ!")
+                # st.rerun() # (ถ้าอยากให้รีเฟรชทันทีให้เปิดบรรทัดนี้)
             except Exception as e: st.error(f"Error: {e}")
 
 # --- SHOW TRADINGVIEW CHART ---
@@ -419,7 +436,3 @@ if not df.empty:
 
 else:
     st.info("👋 ยินดีต้อนรับ! เริ่มบันทึกเทรดแรกของคุณได้เลย")
-
-
-
-
