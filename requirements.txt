@@ -3,3 +3,4 @@ pandas
 supabase
 altair
 Pillow
+extra-streamlit-components
