@@ -95,10 +95,14 @@ def upload_image_to_supabase(uploaded_file, prefix, coin_name):
         return "None"
 
 # ==========================================
-# 📈 TRADINGVIEW CHART FUNCTION
+# 📈 TRADINGVIEW CHART FUNCTION (แก้ไข)
 # ==========================================
 def show_tradingview_chart(coin_name):
     if not coin_name: coin_name = "BTC"
+    
+    # [สำคัญ] ต้องประกาศตัวแปรนี้ก่อน! ไม่งั้นจะ Error
+    chart_height = 800
+    
     html_code = f"""
     <div class="tradingview-widget-container">
       <div id="tradingview_chart"></div>
@@ -106,7 +110,8 @@ def show_tradingview_chart(coin_name):
       <script type="text/javascript">
       new TradingView.widget(
       {{
-      "width": "100%", "height": 800,
+      "width": "100%", 
+      "height": {chart_height}, 
       "symbol": "BINANCE:{coin_name}USDT",
       "interval": "60", "timezone": "Asia/Bangkok",
       "theme": "dark", "style": "1", "locale": "en",
@@ -117,6 +122,8 @@ def show_tradingview_chart(coin_name):
       </script>
     </div>
     """
+    
+    # ตอนนี้โปรแกรมจะรู้จัก chart_height แล้วครับ
     components.html(html_code, height=chart_height + 50)
 
 # ==========================================
@@ -356,4 +363,5 @@ if not df.empty:
 else:
 
     st.info("👋 ยินดีต้อนรับ! เริ่มบันทึกเทรดแรกของคุณได้เลย")
+
 
