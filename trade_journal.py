@@ -117,7 +117,7 @@ def show_tradingview_chart(coin_name):
       </script>
     </div>
     """
-    components.html(html_code, height=450)
+    components.html(html_code, height=chart_height + 50)
 
 # ==========================================
 # 📊 DATA LOADING & CALCULATIONS
@@ -356,3 +356,4 @@ if not df.empty:
 else:
 
     st.info("👋 ยินดีต้อนรับ! เริ่มบันทึกเทรดแรกของคุณได้เลย")
+
