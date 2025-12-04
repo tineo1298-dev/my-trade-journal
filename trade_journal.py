@@ -183,26 +183,27 @@ st.title("☁️ Trading Journal")
 with st.sidebar:
     # [Start] ส่วนเลือก Theme
     st.header("🎨 Theme")
-    
-    # แก้ตรงนี้ครับ (เพิ่ม label_visibility="collapsed")
     theme_mode = st.radio("Theme", ["Dark (ดำ)", "Light (ขาว)"], horizontal=True, label_visibility="collapsed")
     
     if theme_mode == "Light (ขาว)":
         st.markdown("""
             <style>
-                /* บังคับพื้นหลังขาว */
                 .stApp { background-color: #ffffff; color: #000000; }
                 [data-testid="stSidebar"] { background-color: #f0f2f6; }
                 [data-testid="stHeader"] { background-color: rgba(0,0,0,0); }
-                /* ปรับสีตัวอักษรใน Input ให้เข้มขึ้น */
                 .stTextInput, .stNumberInput, .stSelectbox, .stDateInput, .stTextArea {
                     color: #31333F !important;
                 }
                 div[data-baseweb="select"] > div { color: #31333F !important; }
             </style>
         """, unsafe_allow_html=True)
-    # [End] จบส่วนเลือก Theme
-    st.markdown("---")
+    
+    # สังเกตว่าบรรทัดนี้ ต้องย่อหน้าเท่ากับคำว่า if ข้างบน (ห้ามย่อลึกเข้าไป)
+    st.header("📝 สร้างแผน (Plan)")
+
+    c1, c2, c3 = st.columns([1.2, 1, 1])
+    # ... (โค้ดต่อจากนี้เหมือนเดิม) ...
+    
         st.header("📝 สร้างแผน (Plan)")
   
     c1, c2, c3 = st.columns([1.2, 1, 1])
@@ -386,6 +387,7 @@ if not df.empty:
 else:
 
     st.info("👋 ยินดีต้อนรับ! เริ่มบันทึกเทรดแรกของคุณได้เลย")
+
 
 
 
