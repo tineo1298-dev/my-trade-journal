@@ -182,8 +182,7 @@ st.title("☁️ Trading Journal")
 # --- 1. SIDEBAR (PLAN) ---
 with st.sidebar:
     # [Start] ส่วนเลือก Theme
-    st.header("🎨 Theme")
-    theme_mode = st.radio("Theme", ["Dark (ดำ)", "Light (ขาว)"], horizontal=True, label_visibility="collapsed")
+    theme_mode = st.radio("Theme", ["Dark", "Light"], horizontal=True, label_visibility="collapsed")
     
     if theme_mode == "Light (ขาว)":
         st.markdown("""
@@ -382,6 +381,7 @@ if not df.empty:
 else:
 
     st.info("👋 ยินดีต้อนรับ! เริ่มบันทึกเทรดแรกของคุณได้เลย")
+
 
 
 
